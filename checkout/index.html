@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>PayHub</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <link rel="stylesheet" href="/assets/styles.css" />
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+</head>
+<body>
+  <main class="container checkout-shell">
+    <article class="checkout-card">
+      <header><small>SECURE CHECKOUT</small><h2 id="title">결제 정보를 불러오는 중</h2></header>
+      <dl id="summary" class="summary hidden">
+        <div><dt>주문</dt><dd id="order"></dd></div>
+        <div><dt>국가 · 통화</dt><dd id="country"></dd></div>
+        <div class="total"><dt>결제금액</dt><dd id="amount"></dd></div>
+      </dl>
+      <div id="providers" class="providers"></div>
+      <p id="message" class="message"></p>
+    </article>
+    <footer class="build-footer"><small id="buildVersion">PayHub</small></footer>
+  </main>
+  <script src="/assets/config.js"></script>
+  <script src="/assets/checkout.js"></script>
+</body>
+</html>

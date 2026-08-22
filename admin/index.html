@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>PayHub Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <link rel="stylesheet" href="/assets/admin.css" />
+</head>
+<body>
+  <header class="container admin-header">
+    <nav>
+      <ul><li><strong>PayHub</strong></li></ul>
+      <ul><li><small id="publicBase"></small></li><li><button id="logout" class="outline secondary hidden">로그아웃</button></li></ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section id="setupPanel" class="auth-panel hidden">
+      <article>
+        <header><strong>관리자 최초 설정</strong></header>
+        <p>처음 한 번만 관리자 계정을 생성합니다. 비밀번호는 10자 이상으로 설정하세요.</p>
+        <form id="setupForm">
+          <label id="setupTokenLabel" class="hidden">Setup Token<input id="setupToken" type="password" autocomplete="one-time-code" /></label>
+          <label>관리자 ID<input id="setupUser" autocomplete="username" required minlength="3" /></label>
+          <label>비밀번호<input id="setupPass" type="password" autocomplete="new-password" required minlength="10" /></label>
+          <button type="submit">관리자 생성</button>
+        </form>
+      </article>
+    </section>
+
+    <section id="loginPanel" class="auth-panel hidden">
+      <article>
+        <header><strong>관리자 로그인</strong></header>
+        <form id="loginForm">
+          <label>관리자 ID<input id="loginUser" autocomplete="username" required /></label>
+          <label>비밀번호<input id="loginPass" type="password" autocomplete="current-password" required /></label>
+          <button type="submit">로그인</button>
+        </form>
+      </article>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="grid metrics">
+        <article><small>프로젝트</small><h3 id="projectCount">0</h3></article>
+        <article><small>결제 완료</small><h3 id="paidCount">0</h3></article>
+        <article><small>처리 중</small><h3 id="processingCount">0</h3></article>
+      </div>
+
+      <div class="admin-grid">
+        <aside>
+          <article>
+            <header class="row"><strong>프로젝트</strong><button id="newProject" class="outline">추가</button></header>
+            <div id="projectList" class="project-list"></div>
+          </article>
+        </aside>
+
+        <section>
+          <article id="projectEditor">
+            <header><strong id="editorTitle">프로젝트 설정</strong></header>
+            <form id="projectForm">
+              <div class="grid">
+                <label>Project ID<input id="projectId" placeholder="fan-site" required pattern="[a-z0-9_-]+" /></label>
+                <label>표시 이름<input id="projectName" placeholder="Fan Site" required /></label>
+              </div>
+              <label><input id="projectEnabled" type="checkbox" role="switch" checked /> 프로젝트 API 활성화</label>
+              <label>허용 Return Origin<textarea id="origins" rows="3" placeholder="https://fan.example.com\nhttp://localhost:3000"></textarea><small>한 줄에 하나. 경로 없이 origin만 입력.</small></label>
+              <label>Webhook URL<input id="webhookUrl" type="url" placeholder="https://fan.example.com/api/payment/webhook" /></label>
+              <div class="grid">
+                <label>Project API Key<input id="apiKey" type="password" autocomplete="off" /></label>
+                <label>Webhook Secret<input id="webhookSecret" type="password" autocomplete="off" /></label>
+              </div>
+              <div class="grid compact-actions">
+                <button id="showSecrets" type="button" class="outline secondary">키 표시/숨김</button>
+                <button id="rotateApi" type="button" class="outline secondary">API Key 재발급</button>
+                <button id="rotateWebhook" type="button" class="outline secondary">Webhook Secret 재발급</button>
+              </div>
+
+              <hr />
+              <h5>TossPayments</h5>
+              <div class="grid">
+                <label><input id="tossEnabled" type="checkbox" role="switch" /> 사용</label>
+                <label>환경<select id="tossMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
+              </div>
+              <div class="grid">
+                <label>Client Key<input id="tossClientKey" type="password" autocomplete="off" placeholder="나중에 관리자에서 입력" /></label>
+                <label>Secret Key<input id="tossSecretKey" type="password" autocomplete="off" placeholder="나중에 관리자에서 입력" /></label>
+              </div>
+
+              <hr />
+              <h5>Stripe</h5>
+              <div class="grid">
+                <label><input id="stripeEnabled" type="checkbox" role="switch" /> 사용</label>
+                <label>환경<select id="stripeMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
+              </div>
+              <label>Secret Key<input id="stripeSecretKey" type="password" autocomplete="off" placeholder="sk_test_... / sk_live_..." /></label>
+
+              <hr />
+              <h5>Mock</h5>
+              <label><input id="mockEnabled" type="checkbox" role="switch" checked /> PG 키 없이 전체 결제 흐름 테스트</label>
+
+              <footer class="editor-actions">
+                <button type="submit">저장</button>
+                <button id="deleteProject" type="button" class="outline secondary">프로젝트 삭제</button>
+              </footer>
+            </form>
+          </article>
+        </section>
+      </div>
+
+      <article>
+        <header><strong>최근 결제 세션</strong></header>
+        <div class="table-wrap"><table><thead><tr><th>시간</th><th>프로젝트</th><th>주문</th><th>금액</th><th>국가</th><th>PG</th><th>상태</th></tr></thead><tbody id="sessionRows"></tbody></table></div>
+      </article>
+    </section>
+    <p id="notice" class="notice"></p>
+    <footer class="build-footer"><small id="buildVersion">PayHub</small></footer>
+  </main>
+  <script src="/assets/config.js"></script>
+  <script src="/assets/admin.js"></script>
+</body>
+</html>
