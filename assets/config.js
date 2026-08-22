@@ -1,1 +1,1 @@
-window.PAYHUB_CONFIG = { apiBase: 'https://api-payhub.suaveforge.com', buildId: 'v2026.08.22.2337', sourceCommit: 'c90ba5b559474bed92e2a9b6c0bc994138e924fe' };
+window.PAYHUB_CONFIG = { apiBase: 'https://api-payhub.suaveforge.com', buildId: 'v2026.08.22.2344', sourceCommit: '11baf3d730775eb85feab57fe083951766a1499a' };
