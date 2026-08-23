@@ -2,133 +2,330 @@
   const API_BASE = String(window.PAYHUB_CONFIG?.apiBase || '').replace(/\/$/, '');
   const params = new URLSearchParams(location.search);
   const sessionId = params.get('session_id') || '';
-  const title = document.querySelector('#title');
-  const summary = document.querySelector('#summary');
-  const providerSection = document.querySelector('#providerSection');
-  const providers = document.querySelector('#providers');
-  const paymentStage = document.querySelector('#paymentStage');
-  const paymentMethods = document.querySelector('#paymentMethods');
-  const paymentAgreement = document.querySelector('#paymentAgreement');
-  const payButton = document.querySelector('#payButton');
-  const message = document.querySelector('#message');
-  const buildVersion = document.querySelector('#buildVersion');
+
+  const $ = (selector) => document.querySelector(selector);
+  const els = {
+    title: $('#checkoutTitle'),
+    summaryDescription: $('#summaryDescription'),
+    summary: $('#summary'),
+    order: $('#order'),
+    country: $('#country'),
+    totalBlock: $('#totalBlock'),
+    amount: $('#amount'),
+    loadingState: $('#loadingState'),
+    paidState: $('#paidState'),
+    tossCheckout: $('#tossCheckout'),
+    tossPayButton: $('#tossPayButton'),
+    tossPayButtonLabel: $('#tossPayButtonLabel'),
+    hostedCheckout: $('#hostedCheckout'),
+    hostedProviderName: $('#hostedProviderName'),
+    hostedCheckoutCopy: $('#hostedCheckoutCopy'),
+    hostedPayButton: $('#hostedPayButton'),
+    alternateSection: $('#alternateSection'),
+    alternateProviders: $('#alternateProviders'),
+    errorBox: $('#errorBox'),
+    infoBox: $('#infoBox'),
+    buildVersion: $('#buildVersion'),
+  };
+
   let session = null;
   let tossWidgets = null;
-  let paymentMethodWidget = null;
-  let agreementWidget = null;
-  let activeProvider = '';
+  let primaryProvider = '';
+  let busy = false;
 
-  if (buildVersion) {
+  const api = (path, options = {}) => fetch(API_BASE + path, options);
+
+  function money(amount, currency) {
+    return new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: ['KRW', 'JPY'].includes(currency) ? 0 : 2,
+    }).format(amount / (['KRW', 'JPY'].includes(currency) ? 1 : 100));
+  }
+
+  function setBuildVersion() {
+    if (!els.buildVersion) return;
     const build = String(window.PAYHUB_CONFIG?.buildId || 'local');
     const commit = String(window.PAYHUB_CONFIG?.sourceCommit || 'local');
-    buildVersion.textContent = build === 'local' ? 'PayHub · local' : `PayHub · ${build} · ${commit.slice(0, 8)}`;
+    els.buildVersion.textContent = build === 'local' ? 'local' : `${build} · ${commit.slice(0, 8)}`;
   }
 
-  const api = (path, options={}) => fetch(API_BASE + path, options);
-  const money = (amount, currency) => new Intl.NumberFormat(undefined, {style:'currency',currency}).format(amount / (['KRW','JPY'].includes(currency) ? 1 : 100));
-  const setBusy = busy => [...document.querySelectorAll('button')].forEach(x => x.disabled = busy);
+  function hide(el) { el?.classList.add('hidden'); }
+  function show(el) { el?.classList.remove('hidden'); }
 
-  async function load() {
-    if (!API_BASE) throw new Error('API 설정이 없습니다.');
-    if (!sessionId) throw new Error('결제 세션이 없습니다.');
-    if (params.get('cancelled') === '1') message.textContent = '결제가 취소되었습니다. 다른 결제수단을 선택할 수 있습니다.';
-    const r = await api(`/api/public/sessions/${encodeURIComponent(sessionId)}`);
-    if (!r.ok) throw new Error(await r.text());
-    session = await r.json();
-    title.textContent = session.description || '결제';
-    document.querySelector('#order').textContent = session.order_id;
-    document.querySelector('#country').textContent = `${session.country} · ${session.currency}`;
-    document.querySelector('#amount').textContent = money(session.amount, session.currency);
-    summary.classList.remove('hidden');
-    providers.innerHTML = '';
-    if (session.status === 'PAID') { message.textContent = '이미 결제가 완료된 주문입니다.'; return; }
-    if (!Array.isArray(session.providers) || session.providers.length === 0) { message.textContent = '현재 사용할 수 있는 결제수단이 없습니다. 판매처에 문의하세요.'; return; }
-    providerSection.classList.remove('hidden');
-    for (const name of session.providers) {
-      const b = document.createElement('button');
-      b.className = 'provider';
-      b.dataset.provider = name;
-      b.innerHTML = providerLabel(name, session.country);
-      b.onclick = () => chooseProvider(name, b);
-      providers.appendChild(b);
-    }
-    if (session.providers.length === 1) {
-      const only = providers.querySelector('button');
-      await chooseProvider(session.providers[0], only);
-    }
+  function showError(message) {
+    els.errorBox.textContent = message;
+    show(els.errorBox);
   }
 
-  function providerLabel(name, country) {
-    if (name === 'toss') return '<span class="provider-mark toss-mark">T</span><span><strong>토스페이먼츠</strong><small>카드 · 앱카드 · 간편결제 · 계좌이체 등</small></span>';
-    if (name === 'stripe') return `<span class="provider-mark">S</span><span><strong>Stripe</strong><small>${country === 'KR' ? '글로벌 카드 결제' : 'Card / local payment'}</small></span>`;
-    if (name === 'mock') return '<span class="provider-mark">M</span><span><strong>테스트 결제</strong><small>Mock provider</small></span>';
-    return `<span class="provider-mark">•</span><span><strong>${escapeHtml(name)}</strong></span>`;
+  function clearError() {
+    els.errorBox.textContent = '';
+    hide(els.errorBox);
   }
 
-  function escapeHtml(value) {
-    const e = document.createElement('span'); e.textContent = value; return e.innerHTML;
+  function showInfo(message) {
+    els.infoBox.textContent = message;
+    show(els.infoBox);
   }
 
-  async function chooseProvider(name, button) {
-    if (!session || activeProvider === name && name === 'toss' && tossWidgets) return;
-    setBusy(true);
-    message.textContent = '결제수단을 불러오고 있습니다.';
-    providers.querySelectorAll('.provider').forEach(x => x.classList.toggle('selected', x === button));
-    try {
-      const r = await api(`/api/public/sessions/${encodeURIComponent(sessionId)}/providers/${encodeURIComponent(name)}/prepare`, {method:'POST'});
-      const p = await r.json();
-      if (!r.ok) throw new Error(p.error || 'prepare failed');
-      activeProvider = name;
-      if (p.mode === 'redirect') { location.href = p.url; return; }
-      if (p.mode === 'toss_sdk') { await renderTossMethods(p); return; }
-      throw new Error('지원하지 않는 결제 준비 모드입니다.');
-    } catch (e) {
-      activeProvider = '';
-      message.textContent = e.message || String(e);
-      setBusy(false);
-    }
+  function clearInfo() {
+    els.infoBox.textContent = '';
+    hide(els.infoBox);
   }
 
-  async function destroyTossWidgets() {
-    try { await paymentMethodWidget?.destroy?.(); } catch {}
-    try { await agreementWidget?.destroy?.(); } catch {}
-    paymentMethodWidget = null; agreementWidget = null; tossWidgets = null;
-    paymentMethods.innerHTML = ''; paymentAgreement.innerHTML = '';
+  function paymentErrorMessage(code) {
+    const messages = {
+      PAY_PROCESS_CANCELED: '결제가 취소되었습니다. 결제수단을 다시 선택해 주세요.',
+      PAY_PROCESS_ABORTED: '결제가 중단되었습니다. 다른 결제수단을 선택하거나 다시 시도해 주세요.',
+      REJECT_CARD_COMPANY: '결제 승인이 거절되었습니다. 다른 카드 또는 결제수단을 선택해 주세요.',
+      USER_CANCEL: '결제가 취소되었습니다. 결제수단을 다시 선택해 주세요.',
+    };
+    return messages[code] || '결제가 완료되지 않았습니다. 결제수단을 다시 선택해 주세요.';
   }
 
-  async function renderTossMethods(p) {
-    if (!window.TossPayments) throw new Error('TossPayments SDK를 불러오지 못했습니다.');
-    await destroyTossWidgets();
-    paymentStage.classList.remove('hidden');
-    payButton.classList.add('hidden');
-    const toss = TossPayments(p.client_key);
-    tossWidgets = toss.widgets({customerKey: TossPayments.ANONYMOUS});
-    await tossWidgets.setAmount({currency:p.payload.currency, value:p.payload.amount});
-    paymentMethodWidget = await tossWidgets.renderPaymentMethods({selector:'#paymentMethods', variantKey:'DEFAULT'});
-    agreementWidget = await tossWidgets.renderAgreement({selector:'#paymentAgreement', variantKey:'AGREEMENT'}).catch(async () => tossWidgets.renderAgreement({selector:'#paymentAgreement'}));
-    payButton.textContent = `${money(p.payload.amount, p.payload.currency)} 결제하기`;
-    payButton.onclick = async () => {
-      if (!tossWidgets) return;
-      payButton.disabled = true;
-      message.textContent = '선택한 결제수단으로 결제창을 열고 있습니다.';
+  function renderReturnState() {
+    const code = params.get('payment_error') || '';
+    const cancelled = params.get('cancelled') === '1';
+    if (code) showInfo(paymentErrorMessage(code));
+    else if (cancelled) showInfo('결제가 취소되었습니다. 결제수단을 다시 선택해 주세요.');
+  }
+
+  function renderSummary(s) {
+    els.title.textContent = s.description || '결제';
+    els.summaryDescription.textContent = '주문 정보를 확인하고 결제수단을 선택해 주세요.';
+    els.order.textContent = s.order_id;
+    els.country.textContent = `${s.country} · ${s.currency}`;
+    els.amount.textContent = money(s.amount, s.currency);
+    els.tossPayButtonLabel.textContent = `${money(s.amount, s.currency)} 결제하기`;
+    show(els.summary);
+    show(els.totalBlock);
+  }
+
+  async function prepare(name) {
+    const r = await api(`/api/public/sessions/${encodeURIComponent(sessionId)}/providers/${encodeURIComponent(name)}/prepare`, { method: 'POST' });
+    let payload = {};
+    try { payload = await r.json(); } catch {}
+    if (!r.ok) throw new Error(payload.error || `결제 준비에 실패했습니다. (${r.status})`);
+    return payload;
+  }
+
+  async function mountToss(s) {
+    primaryProvider = 'toss';
+    hide(els.loadingState);
+    hide(els.hostedCheckout);
+    show(els.tossCheckout);
+    clearError();
+
+    const prepared = await prepare('toss');
+    if (prepared.mode !== 'toss_widget') throw new Error('TossPayments 주문서형 결제 설정을 확인해 주세요.');
+    if (!window.TossPayments) throw new Error('TossPayments 공식 SDK를 불러오지 못했습니다.');
+
+    const tossPayments = TossPayments(prepared.client_key);
+    tossWidgets = tossPayments.widgets({ customerKey: TossPayments.ANONYMOUS });
+
+    await tossWidgets.setAmount({
+      currency: prepared.payload.currency,
+      value: prepared.payload.amount,
+    });
+
+    await Promise.all([
+      tossWidgets.renderPaymentMethods({
+        selector: '#toss-payment-method',
+        variantKey: prepared.payload.paymentVariantKey || 'DEFAULT',
+      }),
+      tossWidgets.renderAgreement({
+        selector: '#toss-agreement',
+        variantKey: prepared.payload.agreementVariantKey || 'AGREEMENT',
+      }),
+    ]);
+
+    els.tossPayButton.disabled = false;
+    els.tossPayButton.onclick = async () => {
+      if (busy || !tossWidgets) return;
+      busy = true;
+      clearError();
+      els.tossPayButton.disabled = true;
+      els.tossPayButton.setAttribute('aria-busy', 'true');
       try {
         await tossWidgets.requestPayment({
-          orderId:p.payload.orderId,
-          orderName:p.payload.orderName,
-          customerName:p.payload.customerName,
-          successUrl:p.payload.successUrl,
-          failUrl:p.payload.failUrl,
+          orderId: prepared.payload.orderId,
+          orderName: prepared.payload.orderName,
+          successUrl: prepared.payload.successUrl,
+          failUrl: prepared.payload.failUrl,
+          customerName: prepared.payload.customerName || undefined,
         });
-      } catch (e) {
-        if (String(e?.code || '').toUpperCase().includes('USER_CANCEL')) message.textContent = '결제가 취소되었습니다. 다른 결제수단을 선택할 수 있습니다.';
-        else message.textContent = e.message || String(e);
-        payButton.disabled = false;
+      } catch (error) {
+        const code = String(error?.code || '');
+        showError(paymentErrorMessage(code));
+        els.tossPayButton.disabled = false;
+        els.tossPayButton.removeAttribute('aria-busy');
+        busy = false;
       }
     };
-    payButton.classList.remove('hidden');
-    message.textContent = '아래에서 결제수단을 선택하세요.';
-    setBusy(false);
   }
 
-  load().catch(e => { title.textContent='결제를 열 수 없습니다'; message.textContent=e.message || String(e); });
+  function hostedProviderCopy(name, s) {
+    if (name === 'stripe') {
+      return {
+        name: 'Stripe Checkout',
+        title: s.country === 'KR' ? '해외 카드로 결제' : '카드 · 현지 결제수단',
+        copy: 'Stripe가 제공하는 보안 Checkout에서 사용 가능한 카드 및 현지 결제수단을 선택합니다.',
+        button: 'Stripe Checkout에서 계속',
+      };
+    }
+    if (name === 'mock') {
+      return {
+        name: 'PAYHUB TEST',
+        title: '테스트 결제',
+        copy: '실제 결제 없이 PayHub의 결제 완료 흐름만 확인합니다.',
+        button: '테스트 결제 완료',
+      };
+    }
+    return { name, title: '결제 계속하기', copy: '결제사 화면에서 결제를 완료합니다.', button: '계속' };
+  }
+
+  function showHostedProvider(name, s) {
+    primaryProvider = name;
+    hide(els.loadingState);
+    hide(els.tossCheckout);
+    show(els.hostedCheckout);
+    clearError();
+    const copy = hostedProviderCopy(name, s);
+    els.hostedProviderName.textContent = copy.name;
+    $('#hostedCheckoutTitle').textContent = copy.title;
+    els.hostedCheckoutCopy.textContent = copy.copy;
+    els.hostedPayButton.textContent = copy.button;
+    els.hostedPayButton.onclick = () => startRedirectProvider(name);
+  }
+
+  async function startRedirectProvider(name) {
+    if (busy) return;
+    busy = true;
+    clearError();
+    const button = name === primaryProvider ? els.hostedPayButton : document.querySelector(`[data-provider="${CSS.escape(name)}"]`);
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+    }
+    try {
+      const prepared = await prepare(name);
+      if (prepared.mode !== 'redirect' || !prepared.url) throw new Error('결제사 이동 URL을 받지 못했습니다.');
+      location.assign(prepared.url);
+    } catch (error) {
+      showError(error.message || String(error));
+      if (button) {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+      }
+      busy = false;
+    }
+  }
+
+  function renderAlternatives(s, providers) {
+    const alternatives = providers.filter((name) => name !== primaryProvider);
+    els.alternateProviders.innerHTML = '';
+    if (!alternatives.length) {
+      hide(els.alternateSection);
+      return;
+    }
+
+    for (const name of alternatives) {
+      const copy = hostedProviderCopy(name, s);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = name === 'mock' ? 'alternate-button test-provider' : 'alternate-button';
+      button.dataset.provider = name;
+      button.innerHTML = `<span><strong>${escapeHTML(copy.title)}</strong><small>${escapeHTML(copy.name)}</small></span><span class="alternate-arrow" aria-hidden="true">›</span>`;
+      button.addEventListener('click', async () => {
+        if (name === 'toss') {
+          try {
+            show(els.loadingState);
+            hide(els.hostedCheckout);
+            await mountToss(s);
+            renderAlternatives(s, providers);
+          } catch (error) {
+            hide(els.loadingState);
+            showError(tossSetupMessage(error));
+          }
+          return;
+        }
+        await startRedirectProvider(name);
+      });
+      els.alternateProviders.appendChild(button);
+    }
+    show(els.alternateSection);
+  }
+
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  function tossSetupMessage(error) {
+    const code = String(error?.code || '');
+    if (code === 'NOT_SUPPORTED_API_INDIVIDUAL_KEY') {
+      return 'TossPayments 주문서형 결제 연동 키(Client Key: gck 계열)가 필요합니다. PayHub 프로젝트의 TossPayments 키를 확인해 주세요.';
+    }
+    if (code === 'INVALID_CLIENT_KEY') {
+      return 'TossPayments Client Key가 올바르지 않습니다. PayHub 프로젝트 설정을 확인해 주세요.';
+    }
+    if (code === 'NOT_REGISTERED_PAYMENT_WIDGET') {
+      return 'TossPayments 상점관리자에서 이 연동 키에 사용할 결제 UI를 먼저 추가해 주세요.';
+    }
+    return error?.message || 'TossPayments 결제 UI를 불러오지 못했습니다.';
+  }
+
+  async function load() {
+    setBuildVersion();
+    if (!API_BASE) throw new Error('PayHub API 설정이 없습니다.');
+    if (!sessionId) throw new Error('결제 세션이 없습니다.');
+
+    const r = await api(`/api/public/sessions/${encodeURIComponent(sessionId)}`);
+    if (!r.ok) {
+      let body = '';
+      try { body = await r.text(); } catch {}
+      throw new Error(body || '결제 세션을 불러오지 못했습니다.');
+    }
+
+    session = await r.json();
+    renderSummary(session);
+    renderReturnState();
+
+    if (session.status === 'PAID') {
+      hide(els.loadingState);
+      show(els.paidState);
+      return;
+    }
+
+    const providers = Array.isArray(session.providers) ? session.providers : [];
+    if (!providers.length) {
+      hide(els.loadingState);
+      showError('현재 사용할 수 있는 결제수단이 없습니다. 판매처에 문의해 주세요.');
+      return;
+    }
+
+    const preferToss = session.country === 'KR' && session.currency === 'KRW' && providers.includes('toss');
+    if (preferToss) {
+      try {
+        await mountToss(session);
+      } catch (error) {
+        hide(els.loadingState);
+        hide(els.tossCheckout);
+        showError(tossSetupMessage(error));
+        const fallback = providers.find((name) => name !== 'toss');
+        if (fallback) showHostedProvider(fallback, session);
+      }
+    } else {
+      const primary = providers.includes('stripe') ? 'stripe' : providers[0];
+      showHostedProvider(primary, session);
+    }
+
+    renderAlternatives(session, providers);
+  }
+
+  load().catch((error) => {
+    hide(els.loadingState);
+    els.title.textContent = '결제를 열 수 없습니다';
+    els.summaryDescription.textContent = '결제 정보를 다시 확인해 주세요.';
+    showError(error.message || String(error));
+  });
 })();

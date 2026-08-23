@@ -2,9 +2,9 @@
   "project": "payhub",
   "frontend": "https://payhub.suaveforge.com",
   "api": "https://api-payhub.suaveforge.com",
-  "version": "v2026.08.23.1907",
-  "buildId": "20260823-190706-KST",
-  "sourceCommit": "23ba1a80c4402519dca69a8b5b0b73cd8aa32a9c",
-  "artifactSha256": "492ea3a91a125cbfd2a163f4682fcf5b9e3c180b5d698728f035e5f8e081442a",
-  "deployedAt": "2026-08-23T10:07:46.517Z"
+  "version": "v2026.08.23.2205",
+  "buildId": "20260823-220501-KST",
+  "sourceCommit": "36fb5e4c7e9107ee40566bf85a6c5fc286dfeaa2",
+  "artifactSha256": "91af7080d7535365078e570ea3b864a410a16f62e07992f36d7666bd35d940eb",
+  "deployedAt": "2026-08-23T13:05:39.683Z"
 }
