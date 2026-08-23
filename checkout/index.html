@@ -49,6 +49,17 @@
           <span>판매처 주문 화면에서 결제 상태를 확인해 주세요.</span>
         </div>
 
+        <section id="providerChooser" class="provider-chooser hidden" aria-labelledby="providerChooserTitle">
+          <header class="payment-heading provider-heading">
+            <div>
+              <p class="provider-kicker">PAYMENT PROVIDER</p>
+              <h2 id="providerChooserTitle">결제사 선택</h2>
+            </div>
+          </header>
+          <p id="providerHint" class="payment-copy">등록된 결제사를 확인하고 선택하세요.</p>
+          <div id="providerOptions" class="provider-options" role="radiogroup" aria-label="사용 가능한 결제사"></div>
+        </section>
+
         <section id="tossCheckout" class="provider-checkout hidden" aria-labelledby="paymentMethodTitle">
           <header class="payment-heading">
             <div>
@@ -80,11 +91,6 @@
 
         <div id="errorBox" class="checkout-alert error hidden" role="alert"></div>
         <div id="infoBox" class="checkout-alert info hidden" role="status" aria-live="polite"></div>
-
-        <section id="alternateSection" class="alternate-section hidden" aria-labelledby="alternateTitle">
-          <div class="alternate-divider"><span id="alternateTitle">다른 결제 방법</span></div>
-          <div id="alternateProviders" class="alternate-providers"></div>
-        </section>
 
         <footer class="payment-footer">
           <span>Powered by PayHub</span>
