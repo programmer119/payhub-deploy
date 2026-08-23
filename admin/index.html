@@ -61,19 +61,19 @@
             <header><strong id="editorTitle">프로젝트 설정</strong></header>
             <form id="projectForm">
               <div class="grid">
-                <label>Project ID<input id="projectId" placeholder="fan-site" required pattern="[a-z0-9_-]+" /></label>
-                <label>표시 이름<input id="projectName" placeholder="Fan Site" required /></label>
+                <label>프로젝트<select id="projectId" required><option value="">Monitor 프로젝트 불러오는 중...</option></select><small id="projectSourceHint">SuaveForge Monitor 관리 목록을 기준으로 선택합니다.</small></label>
+                <label>표시 이름<input id="projectName" placeholder="PlasticMarket" required /></label>
               </div>
-              <label><input id="projectEnabled" type="checkbox" role="switch" checked /> 프로젝트 API 활성화</label>
+              <label><input id="projectEnabled" type="checkbox" role="switch" checked /> PayHub API 활성화</label>
               <label>허용 Return Origin<textarea id="origins" rows="3" placeholder="https://fan.example.com\nhttp://localhost:3000"></textarea><small>한 줄에 하나. 경로 없이 origin만 입력.</small></label>
               <label>Webhook URL<input id="webhookUrl" type="url" placeholder="https://fan.example.com/api/payment/webhook" /></label>
               <div class="grid">
-                <label>Project API Key<input id="apiKey" type="password" autocomplete="off" /></label>
-                <label>Webhook Secret<input id="webhookSecret" type="password" autocomplete="off" /></label>
+                <label>PayHub API Secret<input id="apiKey" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
+                <label>Webhook Secret<input id="webhookSecret" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
               </div>
               <div class="grid compact-actions">
                 <button id="showSecrets" type="button" class="outline secondary">키 표시/숨김</button>
-                <button id="rotateApi" type="button" class="outline secondary">API Key 재발급</button>
+                <button id="rotateApi" type="button" class="outline secondary">PayHub API Secret 재발급</button>
                 <button id="rotateWebhook" type="button" class="outline secondary">Webhook Secret 재발급</button>
               </div>
 
