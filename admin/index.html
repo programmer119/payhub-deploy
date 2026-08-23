@@ -103,7 +103,7 @@
                 </div>
                 <label><input id="projectEnabled" type="checkbox" role="switch" checked /> PayHub API 활성화</label>
                 <label>허용 Return Origin<textarea id="origins" rows="3" placeholder="https://fan.example.com\nhttp://localhost:3000"></textarea><small>한 줄에 하나. 경로 없이 origin만 입력.</small></label>
-                <label>Webhook URL<input id="webhookUrl" type="url" placeholder="https://fan.example.com/api/payment/webhook" /></label>
+                <label>Hub Bridge Webhook <span class="auto-label">자동</span><input id="webhookUrl" type="url" readonly placeholder="Monitor 프로젝트 선택 시 자동 설정" /><small id="webhookHint">Monitor 공개 URL + /api/hub/events 규칙으로 자동 설정합니다.</small></label>
                 <div class="grid">
                   <label>PayHub API Secret<input id="apiKey" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
                   <label>Webhook Secret<input id="webhookSecret" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>

@@ -100,6 +100,18 @@
 
   function monitorProject(id) { return monitorProjects.find(x => x.project_id === id) || null; }
   function payhubProject(id) { return dashboard?.projects?.find(x => x.id === id) || null; }
+  function applyHubBridge(projectId, fallback='') {
+    const mp = monitorProject(projectId);
+    if (mp?.hub_bridge_url) {
+      els.webhookUrl.value = mp.hub_bridge_url;
+      els.webhookUrl.readOnly = true;
+      els.webhookHint.textContent = '공통 Hub Bridge 규칙으로 자동 설정 · 각 Hub 이벤트는 /api/hub/events에서 수신';
+      return;
+    }
+    els.webhookUrl.value = fallback || '';
+    els.webhookUrl.readOnly = true;
+    els.webhookHint.textContent = projectId ? 'Monitor 미등록 기존 설정입니다. 기존 Webhook 값은 보존합니다.' : 'Monitor 프로젝트 선택 시 공개 URL + /api/hub/events로 자동 설정합니다.';
+  }
   function projectName(id) { return payhubProject(id)?.name || monitorProject(id)?.name || id; }
   function provider(p, name) { return p?.providers?.[name] || {enabled:false,mode:'test',client_key:'',secret_key:''}; }
   function enabledProviderNames(p) {
@@ -208,7 +220,7 @@
     els.editorTitle.textContent = p.name || p.id;
     els.editorState.textContent = p.enabled ? '활성' : '비활성'; els.editorState.className=`state-chip ${p.enabled?'on':'off'}`;
     renderProjectOptions(p.id); els.projectName.value=p.name||p.id; els.projectEnabled.checked=!!p.enabled;
-    els.origins.value=(p.allowed_return_origins||[]).join('\n'); els.webhookUrl.value=p.webhook_url||''; els.apiKey.value=p.api_key||''; els.webhookSecret.value=p.webhook_secret||'';
+    els.origins.value=(p.allowed_return_origins||[]).join('\n'); applyHubBridge(p.id,p.webhook_url||''); els.apiKey.value=p.api_key||''; els.webhookSecret.value=p.webhook_secret||'';
     const t=provider(p,'toss'), st=provider(p,'stripe'), m=provider(p,'mock');
     els.tossEnabled.checked=!!t.enabled; els.tossMode.value=t.mode||'test'; els.tossClientKey.value=t.client_key||''; els.tossSecretKey.value=t.secret_key||'';
     els.stripeEnabled.checked=!!st.enabled; els.stripeMode.value=st.mode||'test'; els.stripeSecretKey.value=st.secret_key||''; els.mockEnabled.checked=!!m.enabled;
@@ -216,7 +228,7 @@
     if(!stay) showView('projects');
   }
   function resetNewForm() {
-    els.projectForm.reset(); els.projectEnabled.checked=true; els.mockEnabled.checked=true; els.tossMode.value='test'; els.stripeMode.value='test';
+    els.projectForm.reset(); els.projectEnabled.checked=true; els.mockEnabled.checked=true; els.tossMode.value='test'; els.stripeMode.value='test'; applyHubBridge('');
     $('#deleteProject').disabled=true; $('#rotateApi').disabled=true; $('#rotateWebhook').disabled=true;
   }
   function newProject({stay=false}={}) {
@@ -227,7 +239,7 @@
     const mp = monitorProject(id); if (!mp) return;
     selectedId = null; resetNewForm(); renderProjectOptions(id); els.projectId.value=id;
     els.editorTitle.textContent = mp.name || id; els.editorState.textContent='신규'; els.editorState.className='state-chip';
-    els.projectName.value = mp.name || id; els.origins.value = mp.return_origin || ''; renderProjectList();
+    els.projectName.value = mp.name || id; els.origins.value = mp.return_origin || ''; applyHubBridge(id); renderProjectList();
   }
   function payload() {
     return {
