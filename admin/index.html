@@ -11,12 +11,19 @@
 <body>
   <header class="container admin-header">
     <nav>
-      <ul><li><strong>PayHub</strong></li></ul>
-      <ul><li><small id="publicBase"></small></li><li><button id="logout" class="outline secondary hidden">로그아웃</button></li></ul>
+      <ul>
+        <li><a id="homeLink" class="brand-link" href="#home" aria-label="PayHub 관리자 홈">PayHub</a></li>
+      </ul>
+      <ul class="header-actions">
+        <li><a id="apiHealthLink" class="api-link" href="#" target="_blank" rel="noreferrer"><span class="status-dot"></span><span>API 연결됨</span></a></li>
+        <li><button id="navProjects" type="button" class="outline secondary hidden">프로젝트 <span id="navProjectCount" class="nav-count">0</span></button></li>
+        <li><button id="navSessions" type="button" class="outline secondary hidden">결제 세션</button></li>
+        <li><button id="logout" type="button" class="outline secondary hidden">로그아웃</button></li>
+      </ul>
     </nav>
   </header>
 
-  <main class="container">
+  <main class="container admin-main">
     <section id="setupPanel" class="auth-panel hidden">
       <article>
         <header><strong>관리자 최초 설정</strong></header>
@@ -42,79 +49,125 @@
     </section>
 
     <section id="app" class="hidden">
-      <div class="grid metrics">
-        <article><small>프로젝트</small><h3 id="projectCount">0</h3></article>
-        <article><small>결제 완료</small><h3 id="paidCount">0</h3></article>
-        <article><small>처리 중</small><h3 id="processingCount">0</h3></article>
-      </div>
+      <section id="homeView" class="app-view">
+        <div class="page-heading">
+          <div><small class="eyebrow">PAYMENT OPERATIONS</small><h1>PayHub 관리</h1><p>프로젝트 연결 상태와 최근 결제를 한 화면에서 확인합니다.</p></div>
+          <button id="homeAddProject" type="button">프로젝트 연결</button>
+        </div>
 
-      <div class="admin-grid">
-        <aside>
+        <div class="grid metrics" aria-label="대시보드 요약">
+          <button id="metricProjects" type="button" class="metric-card">
+            <span>등록 프로젝트</span><strong id="projectCount">0</strong><small>목록 보기</small>
+          </button>
+          <button id="metricPaid" type="button" class="metric-card">
+            <span>최근 결제 완료</span><strong id="paidCount">0</strong><small>최근 세션 기준</small>
+          </button>
+          <button id="metricProcessing" type="button" class="metric-card">
+            <span>처리 중</span><strong id="processingCount">0</strong><small>처리 중 세션 보기</small>
+          </button>
+        </div>
+
+        <div class="home-grid">
           <article>
-            <header class="row"><strong>프로젝트</strong><button id="newProject" class="outline">추가</button></header>
-            <div id="projectList" class="project-list"></div>
+            <header class="section-header"><div><strong>프로젝트</strong><small id="homeProjectSummary"></small></div><button id="homeAllProjects" type="button" class="outline">전체 보기</button></header>
+            <div id="homeProjectCards" class="home-project-cards"></div>
           </article>
-        </aside>
-
-        <section>
-          <article id="projectEditor">
-            <header><strong id="editorTitle">프로젝트 설정</strong></header>
-            <form id="projectForm">
-              <div class="grid">
-                <label>프로젝트<select id="projectId" required><option value="">Monitor 프로젝트 불러오는 중...</option></select><small id="projectSourceHint">SuaveForge Monitor 관리 목록을 기준으로 선택합니다.</small></label>
-                <label>표시 이름<input id="projectName" placeholder="PlasticMarket" required /></label>
-              </div>
-              <label><input id="projectEnabled" type="checkbox" role="switch" checked /> PayHub API 활성화</label>
-              <label>허용 Return Origin<textarea id="origins" rows="3" placeholder="https://fan.example.com\nhttp://localhost:3000"></textarea><small>한 줄에 하나. 경로 없이 origin만 입력.</small></label>
-              <label>Webhook URL<input id="webhookUrl" type="url" placeholder="https://fan.example.com/api/payment/webhook" /></label>
-              <div class="grid">
-                <label>PayHub API Secret<input id="apiKey" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
-                <label>Webhook Secret<input id="webhookSecret" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
-              </div>
-              <div class="grid compact-actions">
-                <button id="showSecrets" type="button" class="outline secondary">키 표시/숨김</button>
-                <button id="rotateApi" type="button" class="outline secondary">PayHub API Secret 재발급</button>
-                <button id="rotateWebhook" type="button" class="outline secondary">Webhook Secret 재발급</button>
-              </div>
-
-              <hr />
-              <h5>TossPayments</h5>
-              <div class="grid">
-                <label><input id="tossEnabled" type="checkbox" role="switch" /> 사용</label>
-                <label>환경<select id="tossMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
-              </div>
-              <div class="grid">
-                <label>Client Key<input id="tossClientKey" type="password" autocomplete="off" placeholder="나중에 관리자에서 입력" /></label>
-                <label>Secret Key<input id="tossSecretKey" type="password" autocomplete="off" placeholder="나중에 관리자에서 입력" /></label>
-              </div>
-
-              <hr />
-              <h5>Stripe</h5>
-              <div class="grid">
-                <label><input id="stripeEnabled" type="checkbox" role="switch" /> 사용</label>
-                <label>환경<select id="stripeMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
-              </div>
-              <label>Secret Key<input id="stripeSecretKey" type="password" autocomplete="off" placeholder="sk_test_... / sk_live_..." /></label>
-
-              <hr />
-              <h5>Mock</h5>
-              <label><input id="mockEnabled" type="checkbox" role="switch" checked /> PG 키 없이 전체 결제 흐름 테스트</label>
-
-              <footer class="editor-actions">
-                <button type="submit">저장</button>
-                <button id="deleteProject" type="button" class="outline secondary">프로젝트 삭제</button>
-              </footer>
-            </form>
+          <article>
+            <header class="section-header"><div><strong>최근 결제</strong><small>최신 5건</small></div><button id="homeAllSessions" type="button" class="outline">전체 보기</button></header>
+            <div class="table-wrap compact-table"><table><thead><tr><th>시간</th><th>프로젝트</th><th>금액</th><th>상태</th></tr></thead><tbody id="homeSessionRows"></tbody></table></div>
           </article>
-        </section>
-      </div>
+        </div>
+      </section>
 
-      <article>
-        <header><strong>최근 결제 세션</strong></header>
-        <div class="table-wrap"><table><thead><tr><th>시간</th><th>프로젝트</th><th>주문</th><th>금액</th><th>국가</th><th>PG</th><th>상태</th></tr></thead><tbody id="sessionRows"></tbody></table></div>
-      </article>
+      <section id="projectsView" class="app-view hidden">
+        <div class="page-heading compact-heading">
+          <div><small class="eyebrow">PROJECTS</small><h2>프로젝트 관리</h2><p>Monitor에 등록된 프로젝트를 PayHub와 연결하고 PG 설정을 관리합니다.</p></div>
+          <div class="heading-actions"><button id="refreshMonitor" type="button" class="outline secondary">Monitor 새로고침</button><button id="newProjectTop" type="button">프로젝트 연결</button></div>
+        </div>
+
+        <div class="admin-grid">
+          <aside>
+            <article class="project-panel">
+              <header class="row"><div><strong>PayHub 프로젝트</strong><small id="projectListCount">0개</small></div><button id="newProject" type="button" class="outline">추가</button></header>
+              <div id="projectList" class="project-list"></div>
+            </article>
+          </aside>
+
+          <section>
+            <article id="projectEditor">
+              <header class="editor-header"><div><small id="editorKicker">PROJECT SETTINGS</small><strong id="editorTitle">새 프로젝트</strong></div><span id="editorState" class="state-chip">신규</span></header>
+              <form id="projectForm">
+                <div class="grid">
+                  <label>프로젝트<select id="projectId" required><option value="">Monitor 프로젝트 불러오는 중...</option></select><small id="projectSourceHint">SuaveForge Monitor 관리 목록을 기준으로 선택합니다.</small></label>
+                  <label>표시 이름<input id="projectName" placeholder="PlasticMarket" required /></label>
+                </div>
+                <label><input id="projectEnabled" type="checkbox" role="switch" checked /> PayHub API 활성화</label>
+                <label>허용 Return Origin<textarea id="origins" rows="3" placeholder="https://fan.example.com\nhttp://localhost:3000"></textarea><small>한 줄에 하나. 경로 없이 origin만 입력.</small></label>
+                <label>Webhook URL<input id="webhookUrl" type="url" placeholder="https://fan.example.com/api/payment/webhook" /></label>
+                <div class="grid">
+                  <label>PayHub API Secret<input id="apiKey" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
+                  <label>Webhook Secret<input id="webhookSecret" type="password" autocomplete="off" placeholder="저장 시 자동 생성" /></label>
+                </div>
+                <div class="grid compact-actions">
+                  <button id="showSecrets" type="button" class="outline secondary">키 표시/숨김</button>
+                  <button id="rotateApi" type="button" class="outline secondary">PayHub API Secret 재발급</button>
+                  <button id="rotateWebhook" type="button" class="outline secondary">Webhook Secret 재발급</button>
+                </div>
+
+                <hr />
+                <h5>TossPayments</h5>
+                <div class="grid">
+                  <label><input id="tossEnabled" type="checkbox" role="switch" /> 사용</label>
+                  <label>환경<select id="tossMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
+                </div>
+                <div class="grid">
+                  <label>Client Key<input id="tossClientKey" type="password" autocomplete="off" placeholder="test_gck_..." /></label>
+                  <label>Secret Key<input id="tossSecretKey" type="password" autocomplete="off" placeholder="test_gsk_..." /></label>
+                </div>
+
+                <hr />
+                <h5>Stripe</h5>
+                <div class="grid">
+                  <label><input id="stripeEnabled" type="checkbox" role="switch" /> 사용</label>
+                  <label>환경<select id="stripeMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
+                </div>
+                <label>Secret Key<input id="stripeSecretKey" type="password" autocomplete="off" placeholder="sk_test_... / sk_live_..." /></label>
+
+                <hr />
+                <h5>Mock</h5>
+                <label><input id="mockEnabled" type="checkbox" role="switch" checked /> PG 키 없이 전체 결제 흐름 테스트</label>
+
+                <footer class="editor-actions">
+                  <button id="saveProject" type="submit">저장</button>
+                  <button id="deleteProject" type="button" class="outline secondary">프로젝트 삭제</button>
+                </footer>
+              </form>
+            </article>
+          </section>
+        </div>
+      </section>
+
+      <section id="sessionsView" class="app-view hidden">
+        <div class="page-heading compact-heading">
+          <div><small class="eyebrow">PAYMENTS</small><h2>결제 세션</h2><p>최근 세션 최대 100건을 상태별로 확인합니다.</p></div>
+        </div>
+        <article>
+          <header class="session-toolbar">
+            <div id="sessionFilters" class="filter-group" role="group" aria-label="결제 상태 필터">
+              <button type="button" class="outline secondary active" data-status="ALL">전체 <span id="filterAllCount">0</span></button>
+              <button type="button" class="outline secondary" data-status="PAID">완료 <span id="filterPaidCount">0</span></button>
+              <button type="button" class="outline secondary" data-status="PROCESSING">처리 중 <span id="filterProcessingCount">0</span></button>
+              <button type="button" class="outline secondary" data-status="FAILED">실패 <span id="filterFailedCount">0</span></button>
+              <button type="button" class="outline secondary" data-status="CANCELLED">취소 <span id="filterCancelledCount">0</span></button>
+              <button type="button" class="outline secondary" data-status="CREATED">생성 <span id="filterCreatedCount">0</span></button>
+            </div>
+          </header>
+          <div class="table-wrap"><table><thead><tr><th>시간</th><th>프로젝트</th><th>주문</th><th>금액</th><th>국가</th><th>PG</th><th>상태</th></tr></thead><tbody id="sessionRows"></tbody></table></div>
+        </article>
+      </section>
     </section>
-    <p id="notice" class="notice"></p>
+
+    <p id="notice" class="notice" role="status" aria-live="polite"></p>
     <footer class="build-footer"><small id="buildVersion">PayHub</small></footer>
   </main>
   <script src="/assets/config.js"></script>

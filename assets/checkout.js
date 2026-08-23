@@ -28,7 +28,9 @@
     document.querySelector('#country').textContent = `${s.country} · ${s.currency}`;
     document.querySelector('#amount').textContent = money(s.amount, s.currency);
     summary.classList.remove('hidden');
+    providers.innerHTML = '';
     if (s.status === 'PAID') { message.textContent = '이미 결제가 완료된 주문입니다.'; return; }
+    if (!Array.isArray(s.providers) || s.providers.length === 0) { message.textContent = '현재 사용할 수 있는 결제수단이 없습니다. 판매처에 문의하세요.'; return; }
     for (const name of s.providers) {
       const b = document.createElement('button');
       b.className = 'provider';
