@@ -80,23 +80,26 @@
       </section>
 
       <section id="projectsView" class="app-view hidden">
-        <div class="page-heading compact-heading">
-          <div><small class="eyebrow">PROJECTS</small><h2>프로젝트 관리</h2><p>Monitor에 등록된 프로젝트를 PayHub와 연결하고 PG 설정을 관리합니다.</p></div>
-          <div class="heading-actions"><button id="refreshMonitor" type="button" class="outline secondary">Monitor 새로고침</button><button id="newProjectTop" type="button">프로젝트 연결</button></div>
-        </div>
+        <section id="projectsListPane">
+          <div class="page-heading compact-heading">
+            <div><small class="eyebrow">PROJECTS</small><h2>프로젝트 관리</h2><p>Monitor에 등록된 프로젝트를 PayHub와 연결하고 PG 설정을 관리합니다.</p></div>
+            <div class="heading-actions"><button id="refreshMonitor" type="button" class="outline secondary">Monitor 새로고침</button><button id="newProjectTop" type="button">프로젝트 연결</button></div>
+          </div>
+          <div id="projectsResult" class="action-result hidden" role="status" aria-live="polite"></div>
+          <article class="project-panel project-panel-full">
+            <header class="row"><div><strong>PayHub 프로젝트</strong><small id="projectListCount">0개</small></div><button id="newProject" type="button" class="outline">추가</button></header>
+            <div id="projectList" class="project-list project-list-full"></div>
+          </article>
+        </section>
 
-        <div class="admin-grid">
-          <aside>
-            <article class="project-panel">
-              <header class="row"><div><strong>PayHub 프로젝트</strong><small id="projectListCount">0개</small></div><button id="newProject" type="button" class="outline">추가</button></header>
-              <div id="projectList" class="project-list"></div>
-            </article>
-          </aside>
-
-          <section>
-            <article id="projectEditor">
-              <header class="editor-header"><div><small id="editorKicker">PROJECT SETTINGS</small><strong id="editorTitle">새 프로젝트</strong></div><span id="editorState" class="state-chip">신규</span></header>
-              <form id="projectForm">
+        <section id="projectEditorPane" class="hidden">
+          <button id="backProjects" type="button" class="back-link">← 프로젝트 목록</button>
+          <div class="page-heading compact-heading editor-page-heading">
+            <div><small class="eyebrow">PROJECT SETTINGS</small><h2 id="editorPageTitle">프로젝트 설정</h2><p>결제 연결과 PG 자격 증명을 관리합니다.</p></div>
+          </div>
+          <article id="projectEditor">
+            <header class="editor-header"><div><small id="editorKicker">PROJECT SETTINGS</small><strong id="editorTitle">새 프로젝트</strong></div><span id="editorState" class="state-chip">신규</span></header>
+            <form id="projectForm">
                 <div class="grid">
                   <label>프로젝트<select id="projectId" required><option value="">Monitor 프로젝트 불러오는 중...</option></select><small id="projectSourceHint">SuaveForge Monitor 관리 목록을 기준으로 선택합니다.</small></label>
                   <label>표시 이름<input id="projectName" placeholder="PlasticMarket" required /></label>
@@ -132,19 +135,25 @@
                   <label>환경<select id="stripeMode"><option value="test">TEST</option><option value="live">LIVE</option></select></label>
                 </div>
                 <label>Secret Key<input id="stripeSecretKey" type="password" autocomplete="off" placeholder="sk_test_... / sk_live_..." /></label>
+                <div id="stripeConnectionSummary" class="connection-summary" aria-label="Stripe 연결 정보">
+                  <div><span>Project ID</span><strong id="stripeProjectIdPreview">프로젝트 선택 필요</strong></div>
+                  <div><span>표시 이름</span><strong id="stripeDisplayNamePreview">프로젝트 선택 필요</strong></div>
+                  <div class="wide"><span>웹훅 URL</span><strong id="stripeWebhookPreview">프로젝트 선택 필요</strong></div>
+                </div>
 
                 <hr />
                 <h5>Mock</h5>
                 <label><input id="mockEnabled" type="checkbox" role="switch" checked /> PG 키 없이 전체 결제 흐름 테스트</label>
 
                 <footer class="editor-actions">
-                  <button id="saveProject" type="submit">저장</button>
+                  <button id="cancelProject" type="button" class="outline secondary">취소</button>
+                  <span class="editor-action-spacer"></span>
                   <button id="deleteProject" type="button" class="outline secondary">프로젝트 삭제</button>
+                  <button id="saveProject" type="submit">저장</button>
                 </footer>
               </form>
             </article>
-          </section>
-        </div>
+        </section>
       </section>
 
       <section id="sessionsView" class="app-view hidden">
