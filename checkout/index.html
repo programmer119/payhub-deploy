@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
+  <meta name="color-scheme" content="light" />
   <title>PayHub</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
   <link rel="stylesheet" href="/assets/styles.css" />
@@ -18,7 +18,16 @@
         <div><dt>국가 · 통화</dt><dd id="country"></dd></div>
         <div class="total"><dt>결제금액</dt><dd id="amount"></dd></div>
       </dl>
-      <div id="providers" class="providers"></div>
+      <section id="providerSection" class="payment-section hidden">
+        <div class="section-label">결제 서비스</div>
+        <div id="providers" class="providers"></div>
+      </section>
+      <section id="paymentStage" class="payment-section hidden">
+        <div class="section-label">결제수단 선택</div>
+        <div id="paymentMethods"></div>
+        <div id="paymentAgreement"></div>
+        <button id="payButton" class="pay-button hidden" type="button">결제하기</button>
+      </section>
       <p id="message" class="message" role="status" aria-live="polite"></p>
     </article>
     <footer class="build-footer"><small id="buildVersion">PayHub</small></footer>
