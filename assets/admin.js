@@ -44,15 +44,15 @@
       const x = await api('/api/admin/monitor-projects');
       monitorProjects = Array.isArray(x.projects) ? x.projects : [];
       els.projectSourceHint.textContent = monitorProjects.length
-        ? `Monitor 관리 프로젝트 ${monitorProjects.length}개 · 공통 Project Key 기준`
-        : 'Monitor에 공통 Project Key가 등록된 활성 프로젝트가 없습니다.';
+        ? `Monitor 등록 프로젝트 ${monitorProjects.length}개 · Project ID(pNN) 기준`
+        : 'Monitor에 등록된 프로젝트가 없습니다.';
     } catch (err) {
       monitorProjects = [];
       els.projectSourceHint.textContent = `Monitor 프로젝트 목록 연결 대기 · ${err.message}`;
     }
   }
 
-  function monitorProject(id) { return monitorProjects.find(x => x.project_key === id) || null; }
+  function monitorProject(id) { return monitorProjects.find(x => x.project_id === id) || null; }
   function payhubProject(id) { return dashboard?.projects?.find(x => x.id === id) || null; }
   function renderProjectOptions(current='') {
     const wanted = String(current || '');
@@ -63,15 +63,16 @@
     els.projectId.appendChild(blank);
     for (const mp of monitorProjects) {
       const o = document.createElement('option');
-      o.value = mp.project_key;
-      o.textContent = `${mp.name || mp.project_key} · ${mp.project_key}${payhubProject(mp.project_key) ? ' · PayHub 등록됨' : ''}`;
+      o.value = mp.project_id;
+      o.textContent = `${mp.label || `${mp.name || mp.project_id} (${mp.project_id})`}${payhubProject(mp.project_id) ? ' · PayHub 등록됨' : ''}${mp.enabled ? '' : ' · OFF'}`;
+      if (!mp.enabled && !payhubProject(mp.project_id)) o.disabled = true;
       els.projectId.appendChild(o);
     }
     if (wanted && !monitorProject(wanted)) {
       const currentPayhub = payhubProject(wanted);
       const o = document.createElement('option');
       o.value = wanted;
-      o.textContent = `${currentPayhub?.name || wanted} · ${wanted} · Monitor 미등록`;
+      o.textContent = `${currentPayhub?.name || wanted} · ${wanted} · 기존 PayHub 설정 · Monitor 미등록`;
       els.projectId.appendChild(o);
     }
     els.projectId.value = wanted;
@@ -86,14 +87,19 @@
     if (selectedId) {
       const p = payhubProject(selectedId);
       if (p) editProject(p); else newProject();
-    } else if (dashboard.projects.length) editProject(dashboard.projects[0]); else newProject();
+    } else {
+      const canonical = dashboard.projects.find(p => monitorProject(p.id));
+      if (canonical) editProject(canonical); else newProject();
+    }
   }
 
   function renderProjectList() {
     els.projectList.innerHTML = '';
     for (const p of dashboard.projects) {
       const b = document.createElement('button'); b.type='button'; b.className='outline secondary' + (p.id===selectedId?' active':'');
-      b.textContent = `${p.name || p.id}${p.enabled ? '' : ' · OFF'}`; b.onclick=()=>editProject(p); els.projectList.appendChild(b);
+      const canonical = monitorProject(p.id);
+      b.textContent = `${p.name || p.id} · ${p.id}${canonical ? '' : ' · Monitor 미등록'}${p.enabled ? '' : ' · OFF'}`;
+      b.onclick=()=>editProject(p); els.projectList.appendChild(b);
     }
   }
   function provider(p, name) { return p?.providers?.[name] || {enabled:false,mode:'test',client_key:'',secret_key:''}; }
