@@ -69,40 +69,36 @@
   }
 
   function normalizeProviderOptions(s) {
-    const labels = { toss: 'TossPayments', stripe: 'Stripe', mock: 'PayHub Test' };
-    const flows = { toss: 'embedded', stripe: 'hosted', mock: 'test' };
+    const labels = { toss: 'TossPayments', stripe: 'Stripe' };
+    const flows = { toss: 'embedded', stripe: 'hosted' };
     if (Array.isArray(s.provider_options) && s.provider_options.length) {
       return s.provider_options.map((p) => ({
         id: String(p.id || '').toLowerCase(),
         name: String(p.name || labels[p.id] || p.id),
         mode: String(p.mode || 'test').toLowerCase(),
         flow: String(p.flow || flows[p.id] || 'hosted').toLowerCase(),
-      })).filter((p) => p.id);
+      })).filter((p) => p.id === 'toss' || p.id === 'stripe');
     }
     return (Array.isArray(s.providers) ? s.providers : []).map((id) => ({
       id, name: labels[id] || id, mode: 'test', flow: flows[id] || 'hosted',
-    }));
+    })).filter((p) => p.id === 'toss' || p.id === 'stripe');
   }
 
   function providerMeta(id) {
     if (id === 'toss') return { title: 'TossPayments', detail: '국내 카드 · 앱카드 · 간편결제' };
     if (id === 'stripe') return { title: 'Stripe', detail: '해외 카드 · 현지 결제수단' };
-    if (id === 'mock') return { title: 'PayHub Test', detail: '내부 결제완료 흐름 시뮬레이션' };
     return { title: id, detail: '등록된 결제사' };
   }
 
   function renderProviderChooser() {
     els.providerOptions.innerHTML = '';
-    const hasRealProvider = providerOptions.some((p) => p.id !== 'mock');
-    els.providerHint.textContent = hasRealProvider
-      ? '등록되어 있고 현재 국가·통화에서 사용 가능한 결제사입니다.'
-      : '현재 이 프로젝트에는 실제 결제사가 없습니다. TossPayments 또는 Stripe 테스트 키를 연결하면 공식 테스트 결제 UI가 표시됩니다.';
+    els.providerHint.textContent = '등록되어 있고 현재 국가·통화에서 사용 가능한 실제 결제사입니다.';
 
     for (const option of providerOptions) {
       const meta = providerMeta(option.id);
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `provider-option${option.id === 'mock' ? ' provider-option-test' : ''}`;
+      button.className = 'provider-option';
       button.dataset.provider = option.id;
       button.setAttribute('role', 'radio');
       button.setAttribute('aria-checked', option.id === activeProvider ? 'true' : 'false');
@@ -174,10 +170,6 @@
     if (name === 'stripe') return {
       name: 'Stripe Checkout', title: s.country === 'KR' ? '해외 카드로 결제' : '카드 · 현지 결제수단',
       copy: 'Stripe의 보안 Checkout으로 이동해 사용 가능한 카드 및 현지 결제수단을 선택합니다.', button: 'Stripe Checkout으로 이동',
-    };
-    if (name === 'mock') return {
-      name: 'PAYHUB TEST', title: '결제 완료 흐름 테스트',
-      copy: '실제 PG 승인 없이 PayHub의 완료 콜백과 주문 복귀 흐름만 확인합니다.', button: '테스트 결제 완료',
     };
     return { name, title: '결제 계속하기', copy: '결제사 화면에서 결제를 완료합니다.', button: '계속' };
   }

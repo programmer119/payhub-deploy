@@ -7,14 +7,17 @@
     navProjects: $('#navProjects'), navSessions: $('#navSessions'), navProjectCount: $('#navProjectCount'), apiHealthLink: $('#apiHealthLink'),
     homeView: $('#homeView'), projectsView: $('#projectsView'), sessionsView: $('#sessionsView'), projectsListPane: $('#projectsListPane'), projectEditorPane: $('#projectEditorPane'), projectsResult: $('#projectsResult'),
     projectList: $('#projectList'), projectListCount: $('#projectListCount'), projectForm: $('#projectForm'), projectId: $('#projectId'), projectName: $('#projectName'), projectEnabled: $('#projectEnabled'), projectSourceHint: $('#projectSourceHint'), origins: $('#origins'), webhookUrl: $('#webhookUrl'), apiKey: $('#apiKey'), webhookSecret: $('#webhookSecret'),
-    tossEnabled: $('#tossEnabled'), tossMode: $('#tossMode'), tossClientKey: $('#tossClientKey'), tossSecretKey: $('#tossSecretKey'), stripeEnabled: $('#stripeEnabled'), stripeMode: $('#stripeMode'), stripeSecretKey: $('#stripeSecretKey'), mockEnabled: $('#mockEnabled'),
+    tossEnabled: $('#tossEnabled'), tossMode: $('#tossMode'), tossClientKey: $('#tossClientKey'), tossSecretKey: $('#tossSecretKey'), stripeEnabled: $('#stripeEnabled'), stripeMode: $('#stripeMode'), stripeSecretKey: $('#stripeSecretKey'),
     homeProjectCards: $('#homeProjectCards'), homeProjectSummary: $('#homeProjectSummary'), homeSessionRows: $('#homeSessionRows'), sessionRows: $('#sessionRows'), sessionFilters: $('#sessionFilters'),
     editorTitle: $('#editorTitle'), editorState: $('#editorState'), saveProject: $('#saveProject'), cancelProject: $('#cancelProject'), backProjects: $('#backProjects'),
-    stripeProjectIdPreview: $('#stripeProjectIdPreview'), stripeDisplayNamePreview: $('#stripeDisplayNamePreview'), stripeWebhookPreview: $('#stripeWebhookPreview')
+    stripeConnectionSummary: $('#stripeConnectionSummary'), stripeProjectIdPreview: $('#stripeProjectIdPreview'), stripeDisplayNamePreview: $('#stripeDisplayNamePreview'), stripeWebhookPreview: $('#stripeWebhookPreview'),
+    webhookHint: $('#webhookHint')
   };
   let dashboard = null;
   let selectedId = null;
   let monitorProjects = [];
+  let monitorCatalogState = 'loading';
+  let monitorCatalogError = '';
   let currentView = 'home';
   let sessionFilter = 'ALL';
   let noticeTimer = null;
@@ -130,12 +133,19 @@
     try {
       const x = await api('/api/admin/monitor-projects');
       monitorProjects = Array.isArray(x.projects) ? x.projects : [];
+      monitorCatalogState = 'ready';
+      monitorCatalogError = '';
       els.projectSourceHint.textContent = monitorProjects.length
         ? `Monitor 등록 프로젝트 ${monitorProjects.length}개 · Project ID(pNN) 기준`
         : 'Monitor에 등록된 프로젝트가 없습니다.';
     } catch (err) {
-      monitorProjects = [];
-      els.projectSourceHint.textContent = `Monitor 프로젝트 목록 연결 대기 · ${err.message}`;
+      monitorCatalogState = 'error';
+      monitorCatalogError = err.message || 'Monitor 연결 실패';
+      // Do not erase the last successfully loaded catalog. A transient Monitor/API
+      // failure must never turn every connected project into "미등록".
+      els.projectSourceHint.textContent = monitorProjects.length
+        ? `Monitor 새로고침 실패 · 마지막 확인 목록 ${monitorProjects.length}개 유지`
+        : `Monitor 연결 상태 확인 실패 · ${monitorCatalogError}`;
       return false;
     }
     return true;
@@ -143,8 +153,33 @@
 
   function monitorProject(id) { return monitorProjects.find(x => x.project_id === id) || null; }
   function payhubProject(id) { return dashboard?.projects?.find(x => x.id === id) || null; }
+  function normalizedEndpoint(raw) {
+    const text=String(raw||'').trim();
+    if(!text) return '';
+    try {
+      const u=new URL(text);
+      const path=(u.pathname||'').replace(/\/+$/,'') || '/';
+      return `${u.protocol.toLowerCase()}//${u.host.toLowerCase()}${path}${u.search}`;
+    } catch (_) {
+      return text.replace(/\/+$/,'');
+    }
+  }
+  function monitorProjectByBridge(raw) {
+    const target=normalizedEndpoint(raw);
+    if(!target) return null;
+    return monitorProjects.find(mp=>normalizedEndpoint(mp.hub_bridge_url)===target) || null;
+  }
+  function payhubConnectionStatus(p) {
+    // PayHub DB/settings is the source of truth for PayHub connection.
+    // Monitor catalog is project metadata only and must never turn an existing
+    // PayHub connection into a false "미등록" state.
+    if(!p) return {state:'missing',label:'미연결'};
+    return p.enabled
+      ? {state:'connected',label:'PayHub 연결'}
+      : {state:'paused',label:'연결 중지'};
+  }
   function applyHubBridge(projectId, fallback='') {
-    const mp = monitorProject(projectId);
+    const mp = monitorProject(projectId) || monitorProjectByBridge(fallback);
     if (mp?.hub_bridge_url) {
       els.webhookUrl.value = mp.hub_bridge_url;
       els.webhookUrl.readOnly = true;
@@ -153,13 +188,13 @@
     }
     els.webhookUrl.value = fallback || '';
     els.webhookUrl.readOnly = true;
-    els.webhookHint.textContent = projectId ? 'Monitor 미등록 기존 설정입니다. 기존 Webhook 값은 보존합니다.' : 'Monitor 프로젝트 선택 시 공개 URL + /api/hub/events로 자동 설정합니다.';
+    els.webhookHint.textContent = projectId ? 'PayHub DB의 기존 Hub Bridge 값을 보존합니다. Monitor 목록은 프로젝트 메타데이터 확인용입니다.' : 'Monitor 프로젝트 선택 시 공개 URL + /api/hub/events로 자동 설정합니다.';
   }
   function projectName(id) { return payhubProject(id)?.name || monitorProject(id)?.name || id; }
   function provider(p, name) { return p?.providers?.[name] || {enabled:false,mode:'test',client_key:'',secret_key:''}; }
   function enabledProviderNames(p) {
-    const labels = {toss:'Toss', stripe:'Stripe', mock:'Mock'};
-    return Object.entries(p?.providers || {}).filter(([,v])=>v?.enabled).map(([k])=>labels[k] || k);
+    const labels = {toss:'Toss', stripe:'Stripe'};
+    return Object.entries(p?.providers || {}).filter(([k,v])=>k!=='mock' && v?.enabled).map(([k])=>labels[k] || k);
   }
   function statusLabel(status) {
     return {PAID:'완료',PROCESSING:'처리 중',FAILED:'실패',CANCELLED:'취소',CREATED:'생성'}[status] || status || '-';
@@ -176,20 +211,21 @@
     els.projectId.innerHTML = '';
     const blank = document.createElement('option');
     blank.value = '';
-    blank.textContent = monitorProjects.length ? 'Monitor 프로젝트 선택' : 'Monitor 프로젝트 목록 없음';
+    blank.textContent = monitorProjects.length ? 'Monitor 프로젝트 선택' : (monitorCatalogState==='error' ? 'Monitor 연결 상태 확인 실패' : 'Monitor 프로젝트 목록 없음');
     els.projectId.appendChild(blank);
     for (const mp of monitorProjects) {
       const o = document.createElement('option');
       o.value = mp.project_id;
-      o.textContent = `${mp.label || `${mp.name || mp.project_id} (${mp.project_id})`}${payhubProject(mp.project_id) ? ' · PayHub 등록됨' : ''}${mp.enabled ? '' : ' · OFF'}`;
+      o.textContent = `${mp.label || `${mp.name || mp.project_id} (${mp.project_id})`}${mp.payhub_connected ? ' · PayHub 연결됨' : mp.payhub_configured ? ' · PayHub 중지됨' : ''}${mp.enabled ? '' : ' · Monitor OFF'}`;
       if (!mp.enabled && !payhubProject(mp.project_id)) o.disabled = true;
       els.projectId.appendChild(o);
     }
     if (wanted && !monitorProject(wanted)) {
       const currentPayhub = payhubProject(wanted);
+      const status = currentPayhub ? payhubConnectionStatus(currentPayhub) : {state:'missing',label:'미연결'};
       const o = document.createElement('option');
       o.value = wanted;
-      o.textContent = `${currentPayhub?.name || wanted} · ${wanted} · 기존 PayHub 설정 · Monitor 미등록`;
+      o.textContent = `${currentPayhub?.name || wanted} · ${wanted} · 기존 PayHub 설정 · ${status.label}`;
       els.projectId.appendChild(o);
     }
     els.projectId.value = wanted;
@@ -198,17 +234,26 @@
   async function loadDashboard() {
     dashboard = await api('/api/admin/dashboard');
     const projects = dashboard.projects || [];
-    $('#projectCount').textContent = projects.length;
+    // Reconcile Monitor selector badges from PayHub DB truth on every dashboard
+    // refresh; no extra Monitor round-trip is required after a PayHub save.
+    const payhubById = new Map(projects.map(p=>[p.id,p]));
+    for (const mp of monitorProjects) {
+      const configured = payhubById.get(mp.project_id);
+      mp.payhub_configured = !!configured;
+      mp.payhub_connected = !!configured?.enabled;
+    }
+    $('#projectCount').textContent = projects.filter(p=>p.enabled).length;
     $('#paidCount').textContent = dashboard.counts.PAID || 0;
     $('#processingCount').textContent = dashboard.counts.PROCESSING || 0;
-    els.navProjectCount.textContent = projects.length;
+    els.navProjectCount.textContent = projects.filter(p=>p.enabled).length;
     els.projectListCount.textContent = `${projects.length}개`;
     renderProjectList(); renderHomeProjects(); renderHomeSessions(); renderSessionFilterCounts(); renderSessions();
   }
 
   function renderHomeProjects() {
     const projects = dashboard?.projects || [];
-    els.homeProjectSummary.textContent = projects.length ? `${projects.length}개 연결됨` : '아직 연결된 프로젝트 없음';
+    const connectedCount=projects.filter(p=>p.enabled).length;
+    els.homeProjectSummary.textContent = connectedCount ? `${connectedCount}개 연결됨` : '아직 연결된 프로젝트 없음';
     els.homeProjectCards.innerHTML = '';
     if (!projects.length) {
       const box = document.createElement('div'); box.className='empty-state';
@@ -217,13 +262,13 @@
     }
     for (const p of projects.slice(0,6)) {
       const b=document.createElement('button'); b.type='button'; b.className='home-project-card';
-      const canonical=!!monitorProject(p.id); const providers=enabledProviderNames(p);
+      const connectionStatus=payhubConnectionStatus(p); const providers=enabledProviderNames(p);
       const head=document.createElement('div'); head.className='project-card-head';
       const name=document.createElement('strong'); name.textContent=p.name || p.id;
       const id=document.createElement('span'); id.className='project-item-id'; id.textContent=p.id;
       head.append(name,id);
       const meta=document.createElement('div'); meta.className='project-card-meta';
-      meta.append(chip(p.enabled?'API ON':'API OFF',p.enabled?'on':'off'), chip(canonical?'Monitor 연결':'Monitor 미등록',canonical?'on':'off'));
+      meta.append(chip(p.enabled?'API ON':'API OFF',p.enabled?'on':'off'), chip(connectionStatus.label,connectionStatus.state==='connected'?'on':'off'));
       for(const label of providers.slice(0,3)) meta.append(chip(label,'on'));
       if(!providers.length) meta.append(chip('PG 미설정','off'));
       b.append(head,meta); b.onclick=()=>editProject(p); els.homeProjectCards.appendChild(b);
@@ -239,13 +284,13 @@
     }
     for (const p of projects) {
       const b=document.createElement('button'); b.type='button'; b.className='project-item' + (p.id===selectedId?' active':'');
-      const canonical=!!monitorProject(p.id); const providers=enabledProviderNames(p);
+      const connectionStatus=payhubConnectionStatus(p); const providers=enabledProviderNames(p);
       const head=document.createElement('span'); head.className='project-item-head';
       const name=document.createElement('strong'); name.textContent=p.name || p.id;
       const id=document.createElement('span'); id.className='project-item-id'; id.textContent=p.id;
       head.append(name,id);
       const meta=document.createElement('span'); meta.className='project-item-meta';
-      meta.append(chip(p.enabled?'ON':'OFF',p.enabled?'on':'off'), chip(canonical?'Monitor':'미등록',canonical?'on':'off'));
+      meta.append(chip(p.enabled?'ON':'OFF',p.enabled?'on':'off'), chip(connectionStatus.state==='connected'?'연결됨':'중지됨',connectionStatus.state==='connected'?'on':'off'));
       if(providers.length) meta.append(chip(providers.join(' · '),'on')); else meta.append(chip('PG 미설정','off'));
       b.dataset.projectId=p.id; b.append(head,meta); b.onclick=()=>editProject(p); els.projectList.appendChild(b);
     }
@@ -267,15 +312,15 @@
     els.editorState.textContent = p.enabled ? '활성' : '비활성'; els.editorState.className=`state-chip ${p.enabled?'on':'off'}`;
     renderProjectOptions(p.id); els.projectName.value=p.name||p.id; els.projectEnabled.checked=!!p.enabled;
     els.origins.value=(p.allowed_return_origins||[]).join('\n'); applyHubBridge(p.id,p.webhook_url||''); els.apiKey.value=p.api_key||''; els.webhookSecret.value=p.webhook_secret||'';
-    const t=provider(p,'toss'), st=provider(p,'stripe'), m=provider(p,'mock');
+    const t=provider(p,'toss'), st=provider(p,'stripe');
     els.tossEnabled.checked=!!t.enabled; els.tossMode.value=t.mode||'test'; els.tossClientKey.value=t.client_key||''; els.tossSecretKey.value=t.secret_key||'';
-    els.stripeEnabled.checked=!!st.enabled; els.stripeMode.value=st.mode||'test'; els.stripeSecretKey.value=st.secret_key||''; els.mockEnabled.checked=!!m.enabled;
+    els.stripeEnabled.checked=!!st.enabled; els.stripeMode.value=st.mode||'test'; els.stripeSecretKey.value=st.secret_key||'';
     $('#deleteProject').disabled=false; $('#rotateApi').disabled=false; $('#rotateWebhook').disabled=false; renderProjectList(); refreshStripeConnectionSummary();
     setProjectPane('edit'); showView('projects',{push:false}); showProjectResult('');
     if(push && location.hash !== projectRouteHash(p.id)) history.pushState(null,'',projectRouteHash(p.id));
   }
   function resetNewForm() {
-    els.projectForm.reset(); els.projectEnabled.checked=true; els.mockEnabled.checked=true; els.tossMode.value='test'; els.stripeMode.value='test'; applyHubBridge('');
+    els.projectForm.reset(); els.projectEnabled.checked=true; els.tossMode.value='test'; els.stripeMode.value='test'; applyHubBridge('');
     $('#deleteProject').disabled=true; $('#rotateApi').disabled=true; $('#rotateWebhook').disabled=true; refreshStripeConnectionSummary();
   }
   function newProject({push=true}={}) {
@@ -295,8 +340,7 @@
       allowed_return_origins: els.origins.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),
       providers: {
         toss: {enabled:els.tossEnabled.checked,mode:els.tossMode.value,client_key:els.tossClientKey.value.trim(),secret_key:els.tossSecretKey.value.trim()},
-        stripe: {enabled:els.stripeEnabled.checked,mode:els.stripeMode.value,secret_key:els.stripeSecretKey.value.trim()},
-        mock: {enabled:els.mockEnabled.checked,mode:'test'}
+        stripe: {enabled:els.stripeEnabled.checked,mode:els.stripeMode.value,secret_key:els.stripeSecretKey.value.trim()}
       }
     };
   }
